@@ -1,8 +1,7 @@
+venv/
 __pycache__/
-data/
-models/
 *.wav
-*.mp4
-*.mkv
-*.avi
-.env
+*.mp3
+*.log
+*.tmp
+*.DS_Store
