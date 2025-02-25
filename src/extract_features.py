@@ -1,12 +1,25 @@
-import numpy as np
-import librosa
+import torchaudio
+import torchaudio.transforms as transforms
 
 def extract_features(audio_file):
-    y, sr = librosa.load(audio_file, sr=None)
-    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-    return np.mean(mfccs, axis=1)
+    """
+    Extrai características MFCC do áudio para comparação usando torchaudio.
+    """
+    try:
+        # Carrega o arquivo de áudio
+        waveform, sample_rate = torchaudio.load(audio_file)
 
-if __name__ == "__main__":
-    audio_file = "audio.wav"
-    features = extract_features(audio_file)
-    print("Características extraídas:", features)
+        # Aplica a transformação MFCC
+        mfcc_transform = transforms.MFCC(
+            sample_rate=sample_rate,
+            n_mfcc=13,  # Número de coeficientes MFCC
+            melkwargs={"n_fft": 400, "hop_length": 160, "n_mels": 23}
+        )
+        mfcc = mfcc_transform(waveform)
+
+        # Retorna os coeficientes MFCC como um array numpy
+        return mfcc.mean(dim=2).squeeze().numpy()
+
+    except Exception as e:
+        print(f"❌ Erro ao extrair características de {audio_file}: {e}")
+        return None
