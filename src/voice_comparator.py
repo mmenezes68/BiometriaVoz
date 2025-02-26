@@ -1,30 +1,43 @@
 import os
-import librosa
+import torch
+import torchaudio
+import torchaudio.transforms as transforms
 import numpy as np
-import soundfile as sf  # Usaremos sf.read() para evitar audioread/aifc
 from scipy.spatial.distance import cosine
 from fpdf import FPDF
 
-# 📌 Extrai características do áudio
-def extract_features(audio_path, sr=22050):
+# 📌 Extrai características do áudio usando torchaudio
+def extract_features(audio_path):
     """ Extrai características MFCC do áudio para comparação """
-    # Lendo o áudio usando soundfile
-    audio, sr = sf.read(audio_path)
+    waveform, sample_rate = torchaudio.load(audio_path)
 
-    # Se o áudio tiver mais de um canal, converte para mono
-    if len(audio.shape) > 1:
-        audio = np.mean(audio, axis=1)
+    # Converte para mono se houver mais de um canal
+    if waveform.shape[0] > 1:
+        waveform = waveform.mean(dim=0, keepdim=True)
 
-    # Extraindo MFCCs (Mel-frequency cepstral coefficients)
-    return librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13).flatten()
+    # Aplica a transformação MFCC
+    mfcc_transform = transforms.MFCC(
+        sample_rate=sample_rate,
+        n_mfcc=13,  # Número de coeficientes MFCC
+        melkwargs={"n_fft": 400, "hop_length": 160, "n_mels": 23}
+    )
+    mfcc = mfcc_transform(waveform)
 
-# 📌 Compara duas vozes
+    return mfcc.mean(dim=2).squeeze().numpy()  # Retorna os coeficientes MFCC
+
+# 📌 Compara duas vozes usando distância do cosseno
 def compare_voices(audio1_path, audio2_path):
     """ Compara dois arquivos de áudio e retorna a similaridade """
     features1 = extract_features(audio1_path)
     features2 = extract_features(audio2_path)
 
-    # Cálculo da distância do cosseno entre os vetores MFCCs
+    # Verifica se os vetores têm o mesmo tamanho
+    if features1.shape != features2.shape:
+        min_length = min(features1.shape[0], features2.shape[0])
+        features1 = features1[:min_length]
+        features2 = features2[:min_length]
+
+    # Calcula a similaridade do cosseno entre os vetores MFCCs
     similarity = 1 - cosine(features1, features2)
     return similarity
 
@@ -43,7 +56,7 @@ def generate_report(audio1_path, audio2_path, similarity, output_path="report.pd
     pdf.cell(200, 10, f"Similaridade: {similarity:.2f}", ln=True)
 
     pdf.output(output_path)
-    print(f"Relatório salvo em {output_path}")
+    print(f"📄 Relatório salvo em {output_path}")
 
 # 📌 Teste do script
 if __name__ == "__main__":
@@ -51,8 +64,8 @@ if __name__ == "__main__":
     audio2_path = "data/raw/audio2.wav"
 
     if not os.path.exists(audio1_path) or not os.path.exists(audio2_path):
-        print("Erro: Arquivos de áudio não encontrados.")
+        print("❌ Erro: Arquivos de áudio não encontrados.")
     else:
         similarity = compare_voices(audio1_path, audio2_path)
-        print(f"Similaridade entre as vozes: {similarity:.2f}")
+        print(f"🆚 Similaridade entre as vozes: {similarity:.2f}")
         generate_report(audio1_path, audio2_path, similarity)
